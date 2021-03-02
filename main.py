@@ -1,4 +1,4 @@
-from NN import Neural_Network
+from neural_network import Neural_Network
 from typing import List
 import random as r
 
