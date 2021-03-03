@@ -2,11 +2,11 @@ from multiprocessing import Pool
 from tqdm import tqdm
 
 
-PROCESSES=10
+PROCESSES=6
 
 import fastrand
 
-r_number = lambda : fastrand.pcg32bounded(1E4)
+r_number = lambda : fastrand.pcg32() / int(2**32)
 
 
 def fastmap(function, iterable, display_progress=False):
@@ -15,12 +15,12 @@ def fastmap(function, iterable, display_progress=False):
         if display_progress:
             with tqdm(total=max_) as pbar:
                 result = list()
-                for res in p.imap_unordered(func=function, iterable=iterable):
+                for res in p.imap(func=function, iterable=iterable):
                     pbar.update()
                     result.append(res)
                 return result
         else:
-            return list(p.imap_unordered(func=function, iterable=iterable))
+            return list(p.imap(func=function, iterable=iterable))
 
 
 #test
