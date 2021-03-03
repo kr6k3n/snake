@@ -1,54 +1,75 @@
 from neural_network import Neural_Network
 from typing import List
 import random as r
-
 from copy import deepcopy as copy
+
+import tqdm
+
+from make_stuff_go_faster import fastmap
+
+
 
 ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "VOID"]
 
-
-frame_x = 720
-frame_y = 480
+frame_y = 20
+frame_x = int(3/2 * frame_y)
 
 input_size = 2*frame_x*frame_y
 
-
+GEN_SIZE = 30
+GENERATION_AMOUNT = 10
 SHAPE = [input_size, 
          input_size//4,
-         input_size//8,
          input_size//16,
+         input_size//64,
          5]
 
-def init_framebuffer() -> List[List[int]]:
-    framebuffer: List[List[int]] = list()
-    for y in range(frame_y):
-        framebuffer.append([])
-        for x in range(frame_x):
-            framebuffer[-1].append(False)
-    return framebuffer
+
+blank_framebuffer: List[List[int]] = list()
+for y in range(frame_y):
+    blank_framebuffer.append([])
+    for x in range(frame_x):
+        blank_framebuffer[-1].append(False)
 
 class Snake():
-    def __init__(self) -> None:
-        self.NN = Neural_Network(SHAPE)
-        self.size =  int()
-        self.time = int()
-        # simulation variables
+    def __init__(self, init_NN=True) -> None:
+        if init_NN:
+            self.NN: Neural_Network = Neural_Network(SHAPE)
+        else:
+            self.NN: Neural_Network = None
+        self.size: int=  int()
+        self.time: int = int()
+        ##### simulation variables #####
+        self.pos: List[int] = [100, 50]
+        self.body: List[List[int]] = [[100, 50], [100-10, 50], [100-(2*10), 50]]
+        self.length: int = 3
+        self.direction: str = 'RIGHT'
+        self.change_to: str = self.direction
+        self.food_pos: List[int] = [r.randrange(1, (frame_x//10)) * 10, r.randrange(1, (frame_y//10)) * 10]
+        self.food_spawn: bool = True
+        self.dead: bool = False
+        ##### data fed to neural network #####
+        self.current_frame: List[List[int]] = None
+        self.framebuffer: List[List[int]] = None
+        self.reset_framebuffer()
+
+    def __repr__(self):
+        return "Snake, "
+
+    def reset_simulation(self):
         self.pos = [100, 50]
         self.body = [[100, 50], [100-10, 50], [100-(2*10), 50]]
         self.length = 3
         self.direction = 'RIGHT'
         self.change_to = self.direction
-        # simultation variables
-        self.food_pos = [random.randrange(1, (frame_size_x//10)) * 10, random.randrange(1, (frame_size_y//10)) * 10]
+        self.food_pos = [r.randrange(1, (frame_x//10)) * 10, r.randrange(1, (frame_y//10)) * 10]
         self.food_spawn = True
-        # data fed to neural network
-        self.current_frame = None
-        self.framebuffer
+        self.dead = False
         self.reset_framebuffer()
 
-    def reset(self) -> None:
-        self.framebuffer = init_framebuffer()
-        self.current_frame = copy(self.framebuffer)
+    def reset_framebuffer(self) -> None:
+        self.framebuffer = copy(blank_framebuffer)
+        self.current_frame = copy(blank_framebuffer)
 
     def score(self) -> int:
         return (self.length*self.time)**2 + self.time
@@ -62,9 +83,25 @@ class Snake():
         nn_output = self.NN.eval(frames)
         return nn_output.index(max(nn_output))
 
+    def render_frames(self) -> None:
+        self.framebuffer = copy(self.current_frame)
+        self.current_frame = blank_framebuffer
+        for pos in self.body:
+            self.current_frame[pos[0]][pos[1]] = True
+        for pos in self.food_pos:
+            self.current_frame[pos[0]][pos[1]] = True
+
+    def merge_frames(self):
+        merged = list()
+        for r1, r2 in zip(self.current_frame, self.framebuffer):
+            for c1,c2 in zip(r1,r2):
+                merged.append(c1)
+                merged.append(c2)
+        return merged
+
     def simulate(self) -> bool: # returns false if snake is dead
         # get neural network output
-        self.change_to = ACTIONS[self.get_output()]
+        self.change_to = ACTIONS[self.get_output(self.merge_frames())]
         # Making sure the snake cannot move in the opposite direction instantaneously
         if self.change_to == 'UP' and self.direction != 'DOWN':
             self.direction = 'UP'
@@ -77,20 +114,20 @@ class Snake():
 
         # Moving the snake
         if self.direction == 'UP':
-            self.snake_pos[1] -= 10
+            self.pos[1] -= 10
         if self.direction == 'DOWN':
-            self.snake_pos[1] += 10
+            self.pos[1] += 10
         if self.direction == 'LEFT':
-            self.snake_pos[0] -= 10
+            self.pos[0] -= 10
         if self.direction == 'RIGHT':
-            self.snake_pos[0] += 10
-        self.snake_body.insert(0, list(self.snake_pos))
+            self.pos[0] += 10
+        self.body.insert(0, list(self.pos))
         # grow snake
-        if self.snake_pos[0] == self.food_pos[0] and self.snake_pos[1] == self.food_pos[1]:
+        if self.pos[0] == self.food_pos[0] and self.pos[1] == self.food_pos[1]:
             self.length += 1
             self.food_spawn = False
         else:
-            self.snake_body.pop()
+            self.body.pop()
         #spawning food
         if not self.food_spawn:
             self.food_pos = [random.randrange(1, (frame_x//10)) * 10, random.randrange(1, (frame_y//10)) * 10]
@@ -98,45 +135,73 @@ class Snake():
 
         # Game Over conditions
         # Getting out of bounds
-        if self.snake_pos[0] < 0 or self.snake_pos[0] > frame_x-10:
+        if self.pos[0] < 0 or self.pos[0] > frame_x-10:
+            self.dead = True
             return False
-        if self.snake_pos[1] < 0 or self.snake_pos[1] > frame_y-10:
+        if self.pos[1] < 0 or self.pos[1] > frame_y-10:
+            self.dead = True
             return False
         # Touching the snake body
-        for block in snake_body[1:]:
-            if self.snake_pos[0] == block[0] and self.snake_pos[1] == block[1]:
+        for block in body[1:]:
+            if self.pos[0] == block[0] and self.pos[1] == block[1]:
+                self.dead = True
                 return False
+        self.render_frames()
+        
+    def reproduce(self, other):
+        child = Snake(init_NN=False)
+        child.NN = self.NN.reproduce(other.NN)
+        return child
+
+def new_snake():
+    return Snake()
 
 class Generation():
     def __init__(self, generation_size: int) -> None:
         self.generation_size = generation_size
-        self.population: List[Snake] = [Snake() for _ in range(self.generation_size)]
+        print("creating initial population...")
+        self.population: List[Snake] = list(fastmap(new_snake, range(self.generation_size), display_progress=True))
+        for s in self.population: print("initialized", s.NN)
         self.alive_snakes = self.population
+    
+    def simulate_step(self) -> None:
+        for snake in self.alive_snakes:
+            if not snake.simulate():
+                self.alive_snakes.remove(snake)  
 
     def simulate_generation(self):
-        pass
+        time = 0
+        while len(self.alive_snakes)> 0:
+            self.simulate_step()
+            # debug
+            print("time", time, ":", len(self.alive_snakes), "snakes alive")
+            time += 1
+        
 
     def next_gen(self) -> None:
         #sort by score
         sorted_snakes = sorted(self.population, key=lambda s : s.score())
+        print("best score here")
         # kill all snakes except top 25%
+        print("killing snakes...")
         sorted_snakes = sorted_snakes[:self.generation_size//4]
         self.population: List[Snake] = list()
-        for _ in range(self.generation_size-10):
+        print("merging snakes")
+        for _ in tqdm.tqdm(range(self.generation_size-10)):
             parent_1, parent_2  = r.choice(sorted_snakes),  r.choice(sorted_snakes)
             self.population.append(parent_1.reproduce(parent_2))
         # add 10 new snakes
-        for _ in range(10):
-            self.population.append()
-    def simulate_step(self) -> None:
-        for snake in self.alive_snakes:
-            if not snake.simulate():
-                self.alive_snakes.remove(snake)        
+        print("adding 10 new snakes")
+        for _ in tqdm.tqdm(range(10)):
+            self.population.append(Snake())
+
+          
 
 
 def main():
-    generation = Generation(generation_size=200)
-    for _ in range(5):
+    generation = Generation(generation_size=GEN_SIZE)
+    for g in range(GENERATION_AMOUNT):
+        print("Simulating gen",g,":")
         generation.simulate_generation()
         generation.next_gen()
     

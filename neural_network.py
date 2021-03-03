@@ -1,12 +1,13 @@
-from multiprocessing.pool import ThreadPool
 from typing import List
 from math import exp
+
 from random import random, randint, choice
+
+from make_stuff_go_faster import r_number
 
 sigmoid = lambda x : 1/(1+ exp(-x)) 
 
-r_number = lambda : random() * 10**(randint(0,5))
-mutation_chance = 10E-2
+mutation_chance = 1E-2
 
 repr_functions = {
     "random": lambda x,y : choice([x,y])
@@ -26,7 +27,7 @@ class Connection():
             for _ in range(left_side):
                 self.weights[-1].append(r_number())
         for _ in range(left_side):
-            self.biases[-1].append(r_number())
+            self.biases.append(r_number())
 
     def eval(self, input_vec)->  List[int]:
         result = []
@@ -62,7 +63,7 @@ class Neural_Network():
     def __init__(self, shape: List[int]) -> None:
         self.shape = shape
         self.layer_connections: List[Connection] = []
-        for i in len(shape[:-1]):
+        for i in range(len(shape[:-1])):
             left_side, right_side = shape[i], shape[i+1] 
             connection = Connection(left_side, right_side)
             connection.random_init()
@@ -74,8 +75,9 @@ class Neural_Network():
             result = self.layer_connections[i].eval(result)
         return result
 
-
-    def reproduce(self, other) -> Neural_Network:
+    def __repr__(self):
+        return "Neural net:" + str(self.shape)
+    def reproduce(self, other):
         child = Neural_Network(self.shape)
         child.layer_connections = [self.layer_connections[i].reproduce(other.layer_connections[i]) 
                                                         for i in range(len(self.layer_connections))]
