@@ -78,7 +78,6 @@ class Neural_Network():
     def reproduce(self, other) -> Neural_Network:
         child = Neural_Network(self.shape)
         child.layer_connections = [self.layer_connections[i].reproduce(other.layer_connections[i]) 
-                                        for i in range(len(self.layer_connections))]
+                                                        for i in range(len(self.layer_connections))]
         return child
-        
-        
+    
