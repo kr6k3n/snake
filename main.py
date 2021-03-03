@@ -19,9 +19,9 @@ input_size = 2*frame_x*frame_y
 GEN_SIZE = 30
 GENERATION_AMOUNT = 10
 SHAPE = [input_size, 
-         input_size//4,
          input_size//16,
          input_size//64,
+         input_size//256,
          5]
 
 
@@ -153,7 +153,7 @@ class Snake():
         child.NN = self.NN.reproduce(other.NN)
         return child
 
-def new_snake():
+def new_snake(x):
     return Snake()
 
 class Generation():
