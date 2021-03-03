@@ -3,7 +3,7 @@ from math import exp
 
 from random import random, randint, choice
 
-from make_stuff_go_faster import r_number
+from make_stuff_go_faster import r_number, fastmap
 
 sigmoid = lambda x : 1/(1+ exp(-x)) 
 
@@ -48,12 +48,10 @@ class Connection():
                     child.weights[-1].append(function(self.weights[i][j], other.weights[i][j]))
 
         for i in range(len(self.biases)):
-            child.biases.append([])
-            for j in range(self.left_side):
-                if random() < mutation_chance:
-                    child.biases[-1].append(r_number())
-                else:
-                    child.biases[-1].append(function(self.biases[i][j], other.biases[i][j]))
+            if random() < mutation_chance:
+                child.biases.append(r_number())
+            else:
+                child.biases.append(function(self.biases[i], other.biases[i]))
 
         return child
 

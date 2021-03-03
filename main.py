@@ -11,7 +11,7 @@ from make_stuff_go_faster import fastmap
 
 ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "VOID"]
 
-frame_y = 20
+frame_y = 50
 frame_x = int(3/2 * frame_y)
 
 input_size = 2*frame_x*frame_y
@@ -19,11 +19,11 @@ input_size = 2*frame_x*frame_y
 GEN_SIZE = 30
 GENERATION_AMOUNT = 10
 SHAPE = [input_size, 
-         input_size//16,
          input_size//64,
          input_size//256,
+         input_size//512,
          5]
-
+print(SHAPE)
 
 blank_framebuffer: List[List[int]] = list()
 for y in range(frame_y):
@@ -130,7 +130,7 @@ class Snake():
             self.body.pop()
         #spawning food
         if not self.food_spawn:
-            self.food_pos = [random.randrange(1, (frame_x//10)) * 10, random.randrange(1, (frame_y//10)) * 10]
+            self.food_pos = [r.randrange(1, (frame_x//10)) * 10, r.randrange(1, (frame_y//10)) * 10]
         self.food_spawn = True
 
         # Game Over conditions
@@ -142,10 +142,11 @@ class Snake():
             self.dead = True
             return False
         # Touching the snake body
-        for block in body[1:]:
+        for block in self.body[1:]:
             if self.pos[0] == block[0] and self.pos[1] == block[1]:
                 self.dead = True
                 return False
+        self.time += 1
         self.render_frames()
         
     def reproduce(self, other):
@@ -156,13 +157,17 @@ class Snake():
 def new_snake(x):
     return Snake()
 
+def create_child(parent_pool) -> Snake:
+    parent_1, parent_2  = r.choice(parent_pool),  r.choice(parent_pool)
+    return parent_1.reproduce(parent_2)
+
 class Generation():
     def __init__(self, generation_size: int) -> None:
         self.generation_size = generation_size
         print("creating initial population...")
         self.population: List[Snake] = list(fastmap(new_snake, range(self.generation_size), display_progress=True))
         for s in self.population: print("initialized", s.NN)
-        self.alive_snakes = self.population
+        self.alive_snakes = [s for s in self.population]
     
     def simulate_step(self) -> None:
         for snake in self.alive_snakes:
@@ -180,22 +185,18 @@ class Generation():
 
     def next_gen(self) -> None:
         #sort by score
-        sorted_snakes = sorted(self.population, key=lambda s : s.score())
-        print("best score here")
+        sorted_snakes = sorted(self.population, key=lambda s : s.score(), reverse=True)
+        print("best score here", sorted_snakes[0].score())
         # kill all snakes except top 25%
         print("killing snakes...")
         sorted_snakes = sorted_snakes[:self.generation_size//4]
-        self.population: List[Snake] = list()
         print("merging snakes")
-        for _ in tqdm.tqdm(range(self.generation_size-10)):
-            parent_1, parent_2  = r.choice(sorted_snakes),  r.choice(sorted_snakes)
-            self.population.append(parent_1.reproduce(parent_2))
-        # add 10 new snakes
-        print("adding 10 new snakes")
-        for _ in tqdm.tqdm(range(10)):
-            self.population.append(Snake())
+        new_snakes_amount = max(1,self.generation_size//100)
+        new_children_amount = self.generation_size-new_snakes_amount
+        self.population = list(fastmap(create_child,list(sorted_snakes for _ in range(new_children_amount)), display_progress=True))
+        print("adding new children")
+        self.population += list(fastmap(new_snake, range(new_snakes_amount), display_progress=True))
 
-          
 
 
 def main():
